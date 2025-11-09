@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chat Vidéo P2P - Windows 95</title>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    @font-face {
+      font-family: 'MS Sans Serif';
+      src: url('https://unpkg.com/98.css/fonts/ms-sans-serif.woff2') format('woff2');
+    }
+    
+    * {
+      box-sizing: border-box;
+    }
+    
+    body {
+      margin: 0;
+      font-family: 'MS Sans Serif', Arial, sans-serif;
+      background: #008080;
+      overflow: hidden;
+    }
+    
+    .window {
+      background: #c0c0c0;
+      border: 2px solid;
+      border-color: #dfdfdf #808080 #808080 #dfdfdf;
+      box-shadow: 2px 2px 0 rgba(0,0,0,0.5);
+    }
+    
+    .title-bar {
+      background: linear-gradient(90deg, #000080, #1084d0);
+      color: white;
+      padding: 3px 4px;
+      font-weight: bold;
+      font-size: 11px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    
+    .title-bar-text {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    
+    .title-bar-controls button {
+      width: 16px;
+      height: 14px;
+      padding: 0;
+      margin-left: 2px;
+      background: #c0c0c0;
+      border: 1px solid;
+      border-color: #fff #000 #000 #fff;
+      font-size: 8px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+    
+    .title-bar-controls button:active {
+      border-color: #000 #fff #fff #000;
+    }
+    
+    .window-body {
+      padding: 12px;
+      background: #c0c0c0;
+    }
+    
+    .button {
+      background: #c0c0c0;
+      border: 2px solid;
+      border-color: #fff #000 #000 #fff;
+      padding: 4px 12px;
+      font-family: 'MS Sans Serif', Arial, sans-serif;
+      font-size: 11px;
+      cursor: pointer;
+      outline: none;
+      min-width: 75px;
+    }
+    
+    .button:active {
+      border-color: #000 #fff #fff #000;
+      padding: 5px 11px 3px 13px;
+    }
+    
+    .button:disabled {
+      color: #808080;
+      text-shadow: 1px 1px 0 #fff;
+      cursor: default;
+    }
+    
+    .input {
+      background: #fff;
+      border: 2px solid;
+      border-color: #808080 #dfdfdf #dfdfdf #808080;
+      padding: 4px;
+      font-family: 'MS Sans Serif', Arial, sans-serif;
+      font-size: 11px;
+      outline: none;
+    }
+    
+    .fieldset {
+      border: 2px groove #c0c0c0;
+      padding: 12px;
+      margin: 8px 0;
+    }
+    
+    .fieldset legend {
+      background: #c0c0c0;
+      padding: 0 4px;
+    }
+    
+    .role-button {
+      background: #c0c0c0;
+      border: 2px solid;
+      border-color: #fff #000 #000 #fff;
+      padding: 20px;
+      font-family: 'MS Sans Serif', Arial, sans-serif;
+      font-size: 11px;
+      cursor: pointer;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .role-button.selected {
+      border-color: #000 #fff #fff #000;
+      background: #000080;
+      color: white;
+    }
+    
+    .status-bar {
+      background: #c0c0c0;
+      border-top: 1px solid #808080;
+      padding: 2px 4px;
+      font-size: 11px;
+      display: flex;
+      gap: 8px;
+    }
+    
+    .status-bar-field {
+      border: 1px solid;
+      border-color: #808080 #fff #fff #808080;
+      padding: 2px 4px;
+    }
+    
+    .command-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 128, 128, 0.95);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+    }
+    
+    .command-window {
+      background: #c0c0c0;
+      border: 2px solid;
+      border-color: #dfdfdf #808080 #808080 #dfdfdf;
+      box-shadow: 4px 4px 0 rgba(0,0,0,0.5);
+      max-width: 500px;
+      width: 90%;
+    }
+    
+    .command-body {
+      padding: 24px;
+      text-align: center;
+    }
+    
+    .command-text {
+      font-size: 24px;
+      font-weight: bold;
+      color: #000080;
+      margin: 20px 0;
+      word-wrap: break-word;
+    }
+    
+    .video-container {
+      border: 2px solid;
+      border-color: #808080 #dfdfdf #dfdfdf #808080;
+      background: #000;
+    }
+    
+    video {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    
+    .label {
+      font-size: 11px;
+      margin-bottom: 4px;
+      display: block;
+    }
+    
+    .history-item {
+      border: 1px solid;
+      border-color: #808080 #fff #fff #808080;
+      padding: 4px 8px;
+      margin: 4px 0;
+      font-size: 11px;
+      background: #fff;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .history-item.confirmed {
+      background: #00ff00;
+    }
+    
+    .icon-crown {
+      width: 32px;
+      height: 32px;
+      background: #ffff00;
+      border: 2px solid #000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+    }
+    
+    .icon-user {
+      width: 32px;
+      height: 32px;
+      background: #0000ff;
+      border: 2px solid #000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      color: white;
+    }
+    
+    .desktop-icon {
+      width: 64px;
+      text-align: center;
+      color: white;
+      font-size: 11px;
+      margin: 8px;
+      cursor: pointer;
+      text-shadow: 1px 1px 2px #000;
+    }
+    
+    .desktop-icon-image {
+      width: 32px;
+      height: 32px;
+      margin: 0 auto 4px;
+      background: #c0c0c0;
+      border: 1px solid #000;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel" data-type="module">
+    const { useState, useEffect, useRef } = React;
+
+    const App = () => {
+      const [screen, setScreen] = useState('welcome');
+      const [profile, setProfile] = useState(null);
+      const [peerId, setPeerId] = useState(null);
+      const [connection, setConnection] = useState(null);
+      const [call, setCall] = useState(null);
+      const [remoteStream, setRemoteStream] = useState(null);
+      const [localStream, setLocalStream] = useState(null);
+      const [inviteLink, setInviteLink] = useState('');
+      const [remotePeerId, setRemotePeerId] = useState('');
+      const [commandText, setCommandText] = useState('');
+      const [commands, setCommands] = useState([]);
+      const [currentCommand, setCurrentCommand] = useState(null);
+      const [remoteProfile, setRemoteProfile] = useState(null);
+
+      const peerRef = useRef(null);
+      const localVideoRef = useRef(null);
+      const remoteVideoRef = useRef(null);
+
+      useEffect(() => {
+        const savedProfile = localStorage.getItem('userProfile');
+        if (savedProfile) {
+          const parsed = JSON.parse(savedProfile);
+          setProfile(parsed);
+          setScreen('dashboard');
+        }
+      }, []);
+
+      useEffect(() => {
+        if (profile && !peerRef.current) {
+          initializePeer();
+        }
+      }, [profile]);
+
+      useEffect(() => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const invitePeerId = urlParams.get('join');
+        if (invitePeerId && profile) {
+          setRemotePeerId(invitePeerId);
+          connectToPeer(invitePeerId);
+        }
+      }, [profile]);
+
+      const initializePeer = async () => {
+        const Peer = (await import('https://esm.sh/peerjs@1.5.2')).default;
+        const peer = new Peer();
+        
+        peer.on('open', (id) => {
+          setPeerId(id);
+          const link = `${window.location.origin}${window.location.pathname}?join=${id}`;
+          setInviteLink(link);
+        });
+
+        peer.on('connection', (conn) => {
+          handleConnection(conn);
+        });
+
+        peer.on('call', async (incomingCall) => {
+          const stream = await getLocalStream();
+          incomingCall.answer(stream);
+          incomingCall.on('stream', (remoteStream) => {
+            setRemoteStream(remoteStream);
+            if (remoteVideoRef.current) {
+              remoteVideoRef.current.srcObject = remoteStream;
+            }
+          });
+          setCall(incomingCall);
+        });
+
+        peerRef.current = peer;
+      };
+
+      const handleConnection = (conn) => {
+        setConnection(conn);
+        
+        conn.on('open', () => {
+          conn.send({ type: 'profile', profile: profile });
+        });
+
+        conn.on('data', (data) => {
+          if (data.type === 'profile') {
+            setRemoteProfile(data.profile);
+            setScreen('video');
+          } else if (data.type === 'command') {
+            const newCommand = { ...data.command, id: Date.now() };
+            setCommands(prev => [...prev, newCommand]);
+            if (profile.role === 'submissive') {
+              setCurrentCommand(newCommand);
+            }
+          } else if (data.type === 'commandConfirm') {
+            setCommands(prev => 
+              prev.map(cmd => cmd.id === data.commandId ? { ...cmd, confirmed: true } : cmd)
+            );
+          }
+        });
+      };
+
+      const getLocalStream = async () => {
+        if (localStream) return localStream;
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        setLocalStream(stream);
+        if (localVideoRef.current) {
+          localVideoRef.current.srcObject = stream;
+        }
+        return stream;
+      };
+
+      const createProfile = (username, role) => {
+        const newProfile = { username, role, createdAt: Date.now() };
+        setProfile(newProfile);
+        localStorage.setItem('userProfile', JSON.stringify(newProfile));
+        setScreen('dashboard');
+      };
+
+      const connectToPeer = async (targetPeerId) => {
+        const idToConnect = targetPeerId || remotePeerId;
+        if (!idToConnect || !peerRef.current) return;
+        
+        setScreen('connecting');
+        
+        const conn = peerRef.current.connect(idToConnect);
+        handleConnection(conn);
+
+        const stream = await getLocalStream();
+        const outgoingCall = peerRef.current.call(idToConnect, stream);
+        
+        outgoingCall.on('stream', (remoteStream) => {
+          setRemoteStream(remoteStream);
+          if (remoteVideoRef.current) {
+            remoteVideoRef.current.srcObject = remoteStream;
+          }
+        });
+        
+        setCall(outgoingCall);
+      };
+
+      const sendCommand = () => {
+        if (!commandText.trim() || !connection) return;
+        
+        const command = {
+          id: Date.now(),
+          text: commandText,
+          timestamp: Date.now(),
+          confirmed: false
+        };
+        
+        connection.send({ type: 'command', command });
+        setCommands(prev => [...prev, command]);
+        setCommandText('');
+      };
+
+      const confirmCommand = (commandId) => {
+        if (!connection) return;
+        connection.send({ type: 'commandConfirm', commandId });
+        setCurrentCommand(null);
+      };
+
+      const dismissCommand = () => {
+        setCurrentCommand(null);
+      };
+
+      const copyInviteLink = () => {
+        navigator.clipboard.writeText(inviteLink);
+        alert('Lien copié dans le presse-papiers !');
+      };
+
+      const logout = () => {
+        if (confirm('Voulez-vous vraiment vous déconnecter ?')) {
+          localStorage.removeItem('userProfile');
+          if (localStream) {
+            localStream.getTracks().forEach(track => track.stop());
+          }
+          if (call) call.close();
+          if (connection) connection.close();
+          if (peerRef.current) peerRef.current.destroy();
+          window.location.reload();
+        }
+      };
+
+      if (screen === 'welcome') {
+        return (
+          <div style={{ 
+            height: '100vh', 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center',
+            padding: '20px'
+          }}>
+            <div className="window" style={{ width: '100%', maxWidth: '500px' }}>
+              <div className="title-bar">
+                <div className="title-bar-text">
+                  <span>💻</span> Chat Vidéo P2P - Nouveau Profil
+                </div>
+                <div className="title-bar-controls">
+                  <button aria-label="Minimize">_</button>
+                  <button aria-label="Maximize">□</button>
+                  <button aria-label="Close">×</button>
+                </div>
+              </div>
+              <div className="window-body">
+                <CreateProfileForm onSubmit={createProfile} />
+              </div>
+              <div className="status-bar">
+                <div className="status-bar-field">Prêt</div>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      if (screen === 'dashboard') {
+        return (
+          <div style={{ 
+            height: '100vh', 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center',
+            padding: '20px'
+          }}>
+            <div className="window" style={{ width: '100%', maxWidth: '600px' }}>
+              <div className="title-bar">
+                <div className="title-bar-text">
+                  <span>{profile.role === 'master' ? '👑' : '👤'}</span> {profile.username} - Tableau de bord
+                </div>
+                <div className="title-bar-controls">
+                  <button aria-label="Minimize">_</button>
+                  <button aria-label="Maximize">□</button>
+                  <button aria-label="Close" onClick={logout}>×</button>
+                </div>
+              </div>
+              <div className="window-body">
+                <fieldset className="fieldset">
+                  <legend>Informations du profil</legend>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+                    {profile.role === 'master' ? (
+                      <div className="icon-crown">👑</div>
+                    ) : (
+                      <div className="icon-user">👤</div>
+                    )}
+                    <div>
+                      <div style={{ fontWeight: 'bold' }}>{profile.username}</div>
+                      <div style={{ fontSize: '10px' }}>
+                        Rôle: {profile.role === 'master' ? 'Maître' : 'Soumis'}
+                      </div>
+                    </div>
+                  </div>
+                </fieldset>
+
+                <fieldset className="fieldset">
+                  <legend>Connexion</legend>
+                  
+                  {peerId ? (
+                    <>
+                      <label className="label">Votre lien d'invitation:</label>
+                      <div style={{ display: 'flex', gap: '4px', marginBottom: '12px' }}>
+                        <input
+                          type="text"
+                          value={inviteLink}
+                          readOnly
+                          className="input"
+                          style={{ flex: 1 }}
+                        />
+                        <button onClick={copyInviteLink} className="button">
+                          Copier
+                        </button>
+                      </div>
+
+                      <hr style={{ border: '1px solid #808080', margin: '12px 0' }} />
+
+                      <label className="label">Ou rejoindre avec un ID:</label>
+                      <div style={{ display: 'flex', gap: '4px' }}>
+                        <input
+                          type="text"
+                          value={remotePeerId}
+                          onChange={(e) => setRemotePeerId(e.target.value)}
+                          placeholder="Entrez l'ID du peer..."
+                          className="input"
+                          style={{ flex: 1 }}
+                        />
+                        <button onClick={() => connectToPeer()} className="button">
+                          Rejoindre
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <div>Connexion au serveur P2P en cours...</div>
+                  )}
+                </fieldset>
+              </div>
+              <div className="status-bar">
+                <div className="status-bar-field">ID: {peerId ? peerId.slice(0, 8) + '...' : 'En attente'}</div>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      if (screen === 'video') {
+        return (
+          <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: '#008080' }}>
+            {currentCommand && profile.role === 'submissive' && (
+              <div className="command-overlay">
+                <div className="command-window">
+                  <div className="title-bar">
+                    <div className="title-bar-text">⚠️ ORDRE REÇU</div>
+                  </div>
+                  <div className="command-body">
+                    <div style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '8px' }}>
+                      NOUVEAU COMMANDEMENT
+                    </div>
+                    <div className="command-text">{currentCommand.text}</div>
+                    <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', marginTop: '20px' }}>
+                      <button onClick={() => confirmCommand(currentCommand.id)} className="button">
+                        ✓ Confirmé
+                      </button>
+                      <button onClick={dismissCommand} className="button">
+                        ✕ Fermer
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px', padding: '4px' }}>
+              <div className="window" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                <div className="title-bar">
+                  <div className="title-bar-text">
+                    📹 {remoteProfile ? remoteProfile.username : 'Invité'}
+                  </div>
+                </div>
+                <div className="video-container" style={{ flex: 1 }}>
+                  <video ref={remoteVideoRef} autoPlay playsInline />
+                </div>
+              </div>
+
+              <div className="window" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                <div className="title-bar">
+                  <div className="title-bar-text">
+                    📹 {profile.username} (Vous)
+                  </div>
+                </div>
+                <div className="video-container" style={{ flex: 1 }}>
+                  <video ref={localVideoRef} autoPlay playsInline muted />
+                </div>
+              </div>
+            </div>
+
+            <div className="window" style={{ margin: '4px' }}>
+              <div className="title-bar">
+                <div className="title-bar-text">
+                  {profile.role === 'master' ? '📝 Panneau de commande' : '📋 Historique'}
+                </div>
+              </div>
+              <div className="window-body">
+                {profile.role === 'master' ? (
+                  <>
+                    <div style={{ display: 'flex', gap: '4px', marginBottom: '8px' }}>
+                      <input
+                        type="text"
+                        value={commandText}
+                        onChange={(e) => setCommandText(e.target.value)}
+                        onKeyPress={(e) => e.key === 'Enter' && sendCommand()}
+                        placeholder="Entrez un ordre..."
+                        className="input"
+                        style={{ flex: 1 }}
+                      />
+                      <button onClick={sendCommand} disabled={!commandText.trim()} className="button">
+                        Envoyer
+                      </button>
+                    </div>
+                    <div style={{ maxHeight: '80px', overflowY: 'auto' }}>
+                      {commands.slice(-3).map((cmd) => (
+                        <div key={cmd.id} className={`history-item ${cmd.confirmed ? 'confirmed' : ''}`}>
+                          <span>{cmd.text}</span>
+                          <span>{cmd.confirmed ? '✓' : '○'}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <div style={{ maxHeight: '120px', overflowY: 'auto' }}>
+                    {commands.slice(-5).map((cmd) => (
+                      <div key={cmd.id} className={`history-item ${cmd.confirmed ? 'confirmed' : ''}`}>
+                        <span>{cmd.text}</span>
+                        <span>{cmd.confirmed ? '✓' : '○'}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      if (screen === 'connecting') {
+        return (
+          <div style={{ 
+            height: '100vh', 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center'
+          }}>
+            <div className="window" style={{ width: '300px' }}>
+              <div className="title-bar">
+                <div className="title-bar-text">⏳ Connexion...</div>
+              </div>
+              <div className="window-body" style={{ textAlign: 'center', padding: '40px 20px' }}>
+                <div style={{ marginBottom: '12px' }}>⌛</div>
+                <div>Connexion au peer en cours...</div>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      return null;
+    };
+
+    const CreateProfileForm = ({ onSubmit }) => {
+      const [username, setUsername] = useState('');
+      const [role, setRole] = useState('');
+
+      const handleSubmit = () => {
+        if (username.trim() && role) {
+          onSubmit(username.trim(), role);
+        }
+      };
+
+      return (
+        <div>
+          <fieldset className="fieldset">
+            <legend>Informations</legend>
+            <label className="label">Nom d'utilisateur:</label>
+            <input
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              onKeyPress={(e) => e.key === 'Enter' && handleSubmit()}
+              placeholder="Entrez votre pseudo..."
+              className="input"
+              style={{ width: '100%', marginBottom: '12px' }}
+            />
+
+            <label className="label">Choisissez votre rôle:</label>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+              <button
+                onClick={() => setRole('master')}
+                className={`role-button ${role === 'master' ? 'selected' : ''}`}
+              >
+                <div className="icon-crown">👑</div>
+                <span>Maître</span>
+              </button>
+              
+              <button
+                onClick={() => setRole('submissive')}
+                className={`role-button ${role === 'submissive' ? 'selected' : ''}`}
+              >
+                <div className="icon-user">👤</div>
+                <span>Soumis</span>
+              </button>
+            </div>
+          </fieldset>
+
+          <div style={{ textAlign: 'center', marginTop: '12px' }}>
+            <button
+              onClick={handleSubmit}
+              disabled={!username.trim() || !role}
+              className="button"
+              style={{ minWidth: '100px' }}
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      );
+    };
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
