@@ -242,22 +242,51 @@
       color: white;
     }
     
-    .desktop-icon {
-      width: 64px;
-      text-align: center;
-      color: white;
+    .chat-box {
+      border: 2px solid;
+      border-color: #808080 #dfdfdf #dfdfdf #808080;
+      background: #fff;
+      height: 150px;
+      overflow-y: auto;
+      padding: 4px;
+      margin-bottom: 4px;
       font-size: 11px;
-      margin: 8px;
-      cursor: pointer;
-      text-shadow: 1px 1px 2px #000;
     }
     
-    .desktop-icon-image {
-      width: 32px;
-      height: 32px;
-      margin: 0 auto 4px;
-      background: #c0c0c0;
+    .chat-message {
+      margin: 2px 0;
+      padding: 2px 4px;
+    }
+    
+    .chat-message.master {
+      background: #ffff00;
       border: 1px solid #000;
+    }
+    
+    .chat-message.submissive {
+      background: #00ffff;
+      border: 1px solid #000;
+    }
+    
+    @keyframes hourglass {
+      0%, 100% { content: '⌛'; }
+      50% { content: '⏳'; }
+    }
+    
+    .loading-hourglass::before {
+      content: '⌛';
+      animation: hourglass 1s infinite;
+      font-size: 32px;
+    }
+    
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9998;
     }
   </style>
 </head>
@@ -281,10 +310,14 @@
       const [commands, setCommands] = useState([]);
       const [currentCommand, setCurrentCommand] = useState(null);
       const [remoteProfile, setRemoteProfile] = useState(null);
+      const [showSettings, setShowSettings] = useState(false);
+      const [chatMessages, setChatMessages] = useState([]);
+      const [chatText, setChatText] = useState('');
 
       const peerRef = useRef(null);
       const localVideoRef = useRef(null);
       const remoteVideoRef = useRef(null);
+      const chatBoxRef = useRef(null);
 
       useEffect(() => {
         const savedProfile = localStorage.getItem('userProfile');
@@ -309,6 +342,12 @@
           connectToPeer(invitePeerId);
         }
       }, [profile]);
+
+      useEffect(() => {
+        if (chatBoxRef.current) {
+          chatBoxRef.current.scrollTop = chatBoxRef.current.scrollHeight;
+        }
+      }, [chatMessages]);
 
       const initializePeer = async () => {
         const Peer = (await import('https://esm.sh/peerjs@1.5.2')).default;
@@ -360,6 +399,8 @@
             setCommands(prev => 
               prev.map(cmd => cmd.id === data.commandId ? { ...cmd, confirmed: true } : cmd)
             );
+          } else if (data.type === 'chat') {
+            setChatMessages(prev => [...prev, data.message]);
           }
         });
       };
@@ -379,6 +420,27 @@
         setProfile(newProfile);
         localStorage.setItem('userProfile', JSON.stringify(newProfile));
         setScreen('dashboard');
+      };
+
+      const updateProfile = (username, role) => {
+        const updatedProfile = { ...profile, username, role };
+        setProfile(updatedProfile);
+        localStorage.setItem('userProfile', JSON.stringify(updatedProfile));
+        setShowSettings(false);
+        alert('Profil mis à jour avec succès !');
+      };
+
+      const deleteProfile = () => {
+        if (confirm('Voulez-vous vraiment supprimer votre profil ? Cette action est irréversible.')) {
+          localStorage.removeItem('userProfile');
+          if (localStream) {
+            localStream.getTracks().forEach(track => track.stop());
+          }
+          if (call) call.close();
+          if (connection) connection.close();
+          if (peerRef.current) peerRef.current.destroy();
+          window.location.reload();
+        }
       };
 
       const connectToPeer = async (targetPeerId) => {
@@ -418,6 +480,21 @@
         setCommandText('');
       };
 
+      const sendChat = () => {
+        if (!chatText.trim() || !connection) return;
+        
+        const message = {
+          text: chatText,
+          sender: profile.role,
+          username: profile.username,
+          timestamp: Date.now()
+        };
+        
+        connection.send({ type: 'chat', message });
+        setChatMessages(prev => [...prev, message]);
+        setChatText('');
+      };
+
       const confirmCommand = (commandId) => {
         if (!connection) return;
         connection.send({ type: 'commandConfirm', commandId });
@@ -435,14 +512,19 @@
 
       const logout = () => {
         if (confirm('Voulez-vous vraiment vous déconnecter ?')) {
-          localStorage.removeItem('userProfile');
           if (localStream) {
             localStream.getTracks().forEach(track => track.stop());
           }
           if (call) call.close();
           if (connection) connection.close();
           if (peerRef.current) peerRef.current.destroy();
-          window.location.reload();
+          setScreen('dashboard');
+          setConnection(null);
+          setCall(null);
+          setRemoteStream(null);
+          setRemoteProfile(null);
+          setChatMessages([]);
+          setCommands([]);
         }
       };
 
@@ -479,88 +561,105 @@
 
       if (screen === 'dashboard') {
         return (
-          <div style={{ 
-            height: '100vh', 
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'center',
-            padding: '20px'
-          }}>
-            <div className="window" style={{ width: '100%', maxWidth: '600px' }}>
-              <div className="title-bar">
-                <div className="title-bar-text">
-                  <span>{profile.role === 'master' ? '👑' : '👤'}</span> {profile.username} - Tableau de bord
-                </div>
-                <div className="title-bar-controls">
-                  <button aria-label="Minimize">_</button>
-                  <button aria-label="Maximize">□</button>
-                  <button aria-label="Close" onClick={logout}>×</button>
-                </div>
-              </div>
-              <div className="window-body">
-                <fieldset className="fieldset">
-                  <legend>Informations du profil</legend>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
-                    {profile.role === 'master' ? (
-                      <div className="icon-crown">👑</div>
-                    ) : (
-                      <div className="icon-user">👤</div>
-                    )}
-                    <div>
-                      <div style={{ fontWeight: 'bold' }}>{profile.username}</div>
-                      <div style={{ fontSize: '10px' }}>
-                        Rôle: {profile.role === 'master' ? 'Maître' : 'Soumis'}
-                      </div>
-                    </div>
+          <>
+            <div style={{ 
+              height: '100vh', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center',
+              padding: '20px'
+            }}>
+              <div className="window" style={{ width: '100%', maxWidth: '600px' }}>
+                <div className="title-bar">
+                  <div className="title-bar-text">
+                    <span>{profile.role === 'master' ? '👑' : '👤'}</span> {profile.username} - Tableau de bord
                   </div>
-                </fieldset>
-
-                <fieldset className="fieldset">
-                  <legend>Connexion</legend>
-                  
-                  {peerId ? (
-                    <>
-                      <label className="label">Votre lien d'invitation:</label>
-                      <div style={{ display: 'flex', gap: '4px', marginBottom: '12px' }}>
-                        <input
-                          type="text"
-                          value={inviteLink}
-                          readOnly
-                          className="input"
-                          style={{ flex: 1 }}
-                        />
-                        <button onClick={copyInviteLink} className="button">
-                          Copier
-                        </button>
+                  <div className="title-bar-controls">
+                    <button aria-label="Minimize">_</button>
+                    <button aria-label="Maximize">□</button>
+                    <button aria-label="Close" onClick={deleteProfile}>×</button>
+                  </div>
+                </div>
+                <div className="window-body">
+                  <fieldset className="fieldset">
+                    <legend>Informations du profil</legend>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+                      {profile.role === 'master' ? (
+                        <div className="icon-crown">👑</div>
+                      ) : (
+                        <div className="icon-user">👤</div>
+                      )}
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 'bold' }}>{profile.username}</div>
+                        <div style={{ fontSize: '10px' }}>
+                          Rôle: {profile.role === 'master' ? 'Maître' : 'Soumis'}
+                        </div>
                       </div>
+                      <button onClick={() => setShowSettings(true)} className="button">
+                        ⚙️ Modifier
+                      </button>
+                    </div>
+                  </fieldset>
 
-                      <hr style={{ border: '1px solid #808080', margin: '12px 0' }} />
+                  <fieldset className="fieldset">
+                    <legend>Connexion</legend>
+                    
+                    {peerId ? (
+                      <>
+                        <label className="label">Votre lien d'invitation:</label>
+                        <div style={{ display: 'flex', gap: '4px', marginBottom: '12px' }}>
+                          <input
+                            type="text"
+                            value={inviteLink}
+                            readOnly
+                            className="input"
+                            style={{ flex: 1 }}
+                          />
+                          <button onClick={copyInviteLink} className="button">
+                            Copier
+                          </button>
+                        </div>
 
-                      <label className="label">Ou rejoindre avec un ID:</label>
-                      <div style={{ display: 'flex', gap: '4px' }}>
-                        <input
-                          type="text"
-                          value={remotePeerId}
-                          onChange={(e) => setRemotePeerId(e.target.value)}
-                          placeholder="Entrez l'ID du peer..."
-                          className="input"
-                          style={{ flex: 1 }}
-                        />
-                        <button onClick={() => connectToPeer()} className="button">
-                          Rejoindre
-                        </button>
+                        <hr style={{ border: '1px solid #808080', margin: '12px 0' }} />
+
+                        <label className="label">Ou rejoindre avec un ID:</label>
+                        <div style={{ display: 'flex', gap: '4px' }}>
+                          <input
+                            type="text"
+                            value={remotePeerId}
+                            onChange={(e) => setRemotePeerId(e.target.value)}
+                            placeholder="Entrez l'ID du peer..."
+                            className="input"
+                            style={{ flex: 1 }}
+                          />
+                          <button onClick={() => connectToPeer()} className="button">
+                            Rejoindre
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <div style={{ textAlign: 'center', padding: '20px' }}>
+                        <div className="loading-hourglass"></div>
+                        <div style={{ marginTop: '12px' }}>Connexion au serveur P2P...</div>
                       </div>
-                    </>
-                  ) : (
-                    <div>Connexion au serveur P2P en cours...</div>
-                  )}
-                </fieldset>
-              </div>
-              <div className="status-bar">
-                <div className="status-bar-field">ID: {peerId ? peerId.slice(0, 8) + '...' : 'En attente'}</div>
+                    )}
+                  </fieldset>
+                </div>
+                <div className="status-bar">
+                  <div className="status-bar-field">ID: {peerId ? peerId.slice(0, 8) + '...' : 'En attente'}</div>
+                </div>
               </div>
             </div>
-          </div>
+
+            {showSettings && (
+              <SettingsModal 
+                profile={profile}
+                onClose={() => setShowSettings(false)}
+                onUpdate={updateProfile}
+                onDelete={deleteProfile}
+              />
+            )}
+          </>
         );
       }
 
@@ -591,11 +690,15 @@
               </div>
             )}
 
-            <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px', padding: '4px' }}>
+            <div style={{ flex: 1, position: 'relative', padding: '4px' }}>
+              {/* Vidéo principale - Remote (grand écran) */}
               <div className="window" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
                 <div className="title-bar">
                   <div className="title-bar-text">
                     📹 {remoteProfile ? remoteProfile.username : 'Invité'}
+                  </div>
+                  <div className="title-bar-controls">
+                    <button aria-label="Close" onClick={logout}>×</button>
                   </div>
                 </div>
                 <div className="video-container" style={{ flex: 1 }}>
@@ -603,27 +706,36 @@
                 </div>
               </div>
 
-              <div className="window" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+              {/* Vidéo secondaire - Local (petit écran PiP) */}
+              <div 
+                className="window" 
+                style={{ 
+                  position: 'absolute', 
+                  bottom: '20px', 
+                  right: '20px', 
+                  width: '240px', 
+                  height: '180px',
+                  zIndex: 100
+                }}
+              >
                 <div className="title-bar">
-                  <div className="title-bar-text">
+                  <div className="title-bar-text" style={{ fontSize: '9px' }}>
                     📹 {profile.username} (Vous)
                   </div>
                 </div>
-                <div className="video-container" style={{ flex: 1 }}>
+                <div className="video-container" style={{ height: 'calc(100% - 20px)' }}>
                   <video ref={localVideoRef} autoPlay playsInline muted />
                 </div>
               </div>
             </div>
 
-            <div className="window" style={{ margin: '4px' }}>
-              <div className="title-bar">
-                <div className="title-bar-text">
-                  {profile.role === 'master' ? '📝 Panneau de commande' : '📋 Historique'}
-                </div>
-              </div>
-              <div className="window-body">
-                {profile.role === 'master' ? (
-                  <>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px', margin: '4px' }}>
+              {profile.role === 'master' && (
+                <div className="window">
+                  <div className="title-bar">
+                    <div className="title-bar-text">📝 Commandes</div>
+                  </div>
+                  <div className="window-body">
                     <div style={{ display: 'flex', gap: '4px', marginBottom: '8px' }}>
                       <input
                         type="text"
@@ -638,6 +750,53 @@
                         Envoyer
                       </button>
                     </div>
+                    <div style={{ maxHeight: '60px', overflowY: 'auto' }}>
+                      {commands.slice(-2).map((cmd) => (
+                        <div key={cmd.id} className={`history-item ${cmd.confirmed ? 'confirmed' : ''}`}>
+                          <span>{cmd.text}</span>
+                          <span>{cmd.confirmed ? '✓' : '○'}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="window" style={{ gridColumn: profile.role === 'submissive' ? 'span 2' : 'auto' }}>
+                <div className="title-bar">
+                  <div className="title-bar-text">💬 Chat</div>
+                </div>
+                <div className="window-body">
+                  <div ref={chatBoxRef} className="chat-box">
+                    {chatMessages.map((msg, i) => (
+                      <div key={i} className={`chat-message ${msg.sender}`}>
+                        <strong>{msg.username}:</strong> {msg.text}
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ display: 'flex', gap: '4px' }}>
+                    <input
+                      type="text"
+                      value={chatText}
+                      onChange={(e) => setChatText(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && sendChat()}
+                      placeholder="Message..."
+                      className="input"
+                      style={{ flex: 1 }}
+                    />
+                    <button onClick={sendChat} disabled={!chatText.trim()} className="button">
+                      Envoyer
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {profile.role === 'submissive' && commands.length > 0 && (
+                <div className="window" style={{ gridColumn: 'span 2' }}>
+                  <div className="title-bar">
+                    <div className="title-bar-text">📋 Historique des ordres</div>
+                  </div>
+                  <div className="window-body">
                     <div style={{ maxHeight: '80px', overflowY: 'auto' }}>
                       {commands.slice(-3).map((cmd) => (
                         <div key={cmd.id} className={`history-item ${cmd.confirmed ? 'confirmed' : ''}`}>
@@ -646,18 +805,9 @@
                         </div>
                       ))}
                     </div>
-                  </>
-                ) : (
-                  <div style={{ maxHeight: '120px', overflowY: 'auto' }}>
-                    {commands.slice(-5).map((cmd) => (
-                      <div key={cmd.id} className={`history-item ${cmd.confirmed ? 'confirmed' : ''}`}>
-                        <span>{cmd.text}</span>
-                        <span>{cmd.confirmed ? '✓' : '○'}</span>
-                      </div>
-                    ))}
                   </div>
-                )}
-              </div>
+                </div>
+              )}
             </div>
           </div>
         );
@@ -676,8 +826,11 @@
                 <div className="title-bar-text">⏳ Connexion...</div>
               </div>
               <div className="window-body" style={{ textAlign: 'center', padding: '40px 20px' }}>
-                <div style={{ marginBottom: '12px' }}>⌛</div>
+                <div className="loading-hourglass" style={{ marginBottom: '12px' }}></div>
                 <div>Connexion au peer en cours...</div>
+                <div style={{ fontSize: '10px', marginTop: '8px', color: '#808080' }}>
+                  Cela peut prendre quelques secondes...
+                </div>
               </div>
             </div>
           </div>
@@ -741,6 +894,85 @@
             >
               OK
             </button>
+          </div>
+        </div>
+      );
+    };
+
+    const SettingsModal = ({ profile, onClose, onUpdate, onDelete }) => {
+      const [username, setUsername] = useState(profile.username);
+      const [role, setRole] = useState(profile.role);
+
+      const handleUpdate = () => {
+        if (username.trim() && role) {
+          onUpdate(username.trim(), role);
+        }
+      };
+
+      return (
+        <div className="modal-overlay">
+          <div className="window" style={{ width: '100%', maxWidth: '500px' }}>
+            <div className="title-bar">
+              <div className="title-bar-text">⚙️ Paramètres du profil</div>
+              <div className="title-bar-controls">
+                <button aria-label="Close" onClick={onClose}>×</button>
+              </div>
+            </div>
+            <div className="window-body">
+              <fieldset className="fieldset">
+                <legend>Modifier le profil</legend>
+                <label className="label">Nom d'utilisateur:</label>
+                <input
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  className="input"
+                  style={{ width: '100%', marginBottom: '12px' }}
+                />
+
+                <label className="label">Rôle:</label>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                  <button
+                    onClick={() => setRole('master')}
+                    className={`role-button ${role === 'master' ? 'selected' : ''}`}
+                  >
+                    <div className="icon-crown">👑</div>
+                    <span>Maître</span>
+                  </button>
+                  
+                  <button
+                    onClick={() => setRole('submissive')}
+                    className={`role-button ${role === 'submissive' ? 'selected' : ''}`}
+                  >
+                    <div className="icon-user">👤</div>
+                    <span>Soumis</span>
+                  </button>
+                </div>
+              </fieldset>
+
+              <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', marginTop: '12px' }}>
+                <button onClick={handleUpdate} className="button" disabled={!username.trim() || !role}>
+                  💾 Sauvegarder
+                </button>
+                <button onClick={onClose} className="button">
+                  Annuler
+                </button>
+              </div>
+
+              <hr style={{ border: '1px solid #808080', margin: '16px 0' }} />
+
+              <fieldset className="fieldset" style={{ borderColor: '#ff0000' }}>
+                <legend style={{ color: '#ff0000' }}>Zone dangereuse</legend>
+                <div style={{ textAlign: 'center' }}>
+                  <p style={{ fontSize: '10px', marginBottom: '8px' }}>
+                    ⚠️ Cette action est irréversible !
+                  </p>
+                  <button onClick={onDelete} className="button" style={{ background: '#ff0000', color: '#fff' }}>
+                    🗑️ Supprimer le profil
+                  </button>
+                </div>
+              </fieldset>
+            </div>
           </div>
         </div>
       );
